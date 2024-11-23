@@ -167,7 +167,7 @@ rules:
     resources: ["ingresses", "networkpolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["rbac.authorization.k8s.io"]  # RBAC resources if Helm needs to set permissions
-    resources: ["roles", "rolebindings", "clusterroles"]
+    resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["policy"]  # RBAC resources if Helm needs to set permissions
     resources: ["poddisruptionbudgets"]
