@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: mysql-backup-cron
+spec:
+  schedule: "*/3 * * * *"  # Run every 3 minutes
+  timezone: "UTC"
+  concurrencyPolicy: "Forbid"
+  workflowSpec:
+    serviceAccountName: argo
+    entrypoint: backup-mysql
+    templates:
+      - name: backup-mysql
+        container:
+          image: gesselsam96/mysql-backup:latest  # Use a custom image with mysql client tools and aws cli installed
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              mysqldump -h mysql.app.svc.cluster.local \
+                        -u $(MYSQL_USER) \
+                        -p$(MYSQL_PASSWORD) \
+                        my_database > /mnt/backups/backup-$(date +%F_%H-%M-%S).sql &&
+              gzip /mnt/backups/backup-$(date +%F_%H-%M-%S).sql &&
+              aws s3 cp /mnt/backups/backup-$(date +%F_%H-%M-%S).sql.gz s3://sql-backup-s3/backups/backup-$(date +%F_%H-%M-%S).sql.gz
+          env:
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-root-credentials
+                  key: username
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-root-credentials
+                  key: password
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: AWS_SECRET_ACCESS_KEY
+          volumeMounts:
+            - name: mysql-backup
+              mountPath: /mnt/backups
+    volumes:
+      - name: mysql-backup
+        persistentVolumeClaim:
+          claimName: mysql-backup-pvc

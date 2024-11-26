@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-backup
+  namespace: argo
+spec:
+  containers:
+  - name: debug-container
+    image: bitnami/mysql:5.7
+    command: ["sleep", "3600"]
+    volumeMounts:
+    - name: mysql-backup
+      mountPath: /mnt/backups
+  volumes:
+  - name: mysql-backup
+    persistentVolumeClaim:
+      claimName: mysql-backup-pvc

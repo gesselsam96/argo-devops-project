@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: mysql-restore
+spec:
+  serviceAccountName: argo
+  entrypoint: restore-mysql
+  arguments:
+    parameters:
+    - name: backup-file
+  templates:
+    - name: restore-mysql
+      inputs:
+        parameters:
+        - name: backup-file
+      container:
+        image: gesselsam96/mysql-backup:latest  # Use a custom image with mysql client tools and aws cli installed
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            aws s3 cp s3://sql-backup-s3/backups/{{inputs.parameters.backup-file}} /tmp/backup.sql.gz &&
+            gunzip /tmp/backup.sql.gz &&
+            mysql -h mysql.app.svc.cluster.local -u $(MYSQL_USER) -p$(MYSQL_PASSWORD) my_database < /tmp/backup.sql
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: aws-credentials
+                key: AWS_ACCESS_KEY_ID
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: aws-credentials
+                key: AWS_SECRET_ACCESS_KEY
+          - name: MYSQL_USER
+            valueFrom:
+              secretKeyRef:
+                name: mysql-root-credentials
+                key: username
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: mysql-root-credentials
+                key: password

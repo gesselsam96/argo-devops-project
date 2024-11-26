@@ -1,0 +1,100 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: helm-deploy-argo-
+spec:
+  serviceAccountName: argo
+  entrypoint: helm-deploy
+  volumes:
+    - name: workspace
+      emptyDir: {}  # Shared volume for cross-step data sharing
+  templates:
+    - name: helm-deploy
+      steps:
+        - - name: check-release
+            template: check-release
+
+        - - name: inspect-directory
+            template: inspect-directory
+
+        - - name: install-or-upgrade
+            template: install-or-upgrade
+            arguments:
+              parameters:
+                - name: release-status
+                  value: "{{steps.check-release.outputs.parameters.release-status}}"
+
+    - name: check-release
+      script:
+        image: alpine:latest
+        command: ["/bin/sh"]
+        source: |
+          # Install curl and bash for Helm installation
+          apk add --no-cache curl bash
+          # Install Helm
+          curl -L https://get.helm.sh/helm-v3.9.0-linux-amd64.tar.gz -o helm.tar.gz
+          tar -xvf helm.tar.gz
+          mv linux-amd64/helm /usr/local/bin/helm
+
+          # Check if Argo WF release exists in the 'argo' namespace
+          if helm status argo-workflows --namespace argo > /dev/null 2>&1; then
+            echo "installed" > /tmp/step-output
+          else
+            echo "not-installed" > /tmp/step-output
+          fi
+      outputs:
+        parameters:
+          - name: release-status
+            valueFrom:
+              path: /tmp/step-output
+
+    - name: inspect-directory
+      script:
+        image: alpine:latest
+        command: ["/bin/sh"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace  # Shared volume for Git repository cloning
+        source: |
+          apk add --no-cache git
+          # Clone the GitHub repository into the shared volume
+          git clone https://github.com/gesselsam96/argo-devops-project.git /workspace
+
+          # List contents to confirm the directory structure
+          echo "Inspecting /workspace contents:"
+          ls -R /workspace
+          cat /workspace/argo-workflows/templates/server/cluster-role.yaml
+
+    - name: install-or-upgrade
+      script:
+        image: alpine:latest
+        command: ["/bin/sh"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace  # Shared volume for Git repository cloning
+        source: |
+          # Install curl, bash, and git
+          apk add --no-cache curl bash git
+
+          # Clone the GitHub repository into the shared volume
+          git clone https://github.com/gesselsam96/argo-devops-project.git /workspace
+          
+          # Install Helm
+          curl -L https://get.helm.sh/helm-v3.9.0-linux-amd64.tar.gz -o helm.tar.gz
+          tar -xvf helm.tar.gz
+          mv linux-amd64/helm /usr/local/bin/helm
+          
+          # Echo the release status input parameter to confirm it was passed
+          echo "Release status is: {{inputs.parameters.release-status}}"
+
+          # Decide based on the release status
+          if [ "{{inputs.parameters.release-status}}" = "not-installed" ]; then
+            echo "Installing Argo Workflow..."
+            helm install argo-workflows /workspace/argo-workflows --namespace argo
+          else
+            echo "Upgrading Argo Workflow..."
+            helm upgrade argo-workflows /workspace/argo-workflows --namespace argo
+          fi
+      inputs:
+        parameters:
+          - name: release-status
