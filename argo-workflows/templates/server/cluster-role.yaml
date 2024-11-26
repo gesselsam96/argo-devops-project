@@ -175,6 +175,9 @@ rules:
   - apiGroups: ["argoproj.io"]  # Workflow operations
     resources: ["workflowtaskresults"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
     
   - apiGroups:
       - argoproj.io
