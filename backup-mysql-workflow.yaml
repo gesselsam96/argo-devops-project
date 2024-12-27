@@ -19,9 +19,9 @@ spec:
               mysqldump -h mysql.app.svc.cluster.local \
                         -u $(MYSQL_USER) \
                         -p$(MYSQL_PASSWORD) \
-                        my_database > /mnt/backups/backup-$(date +%F_%H-%M-%S).sql &&
-              gzip /mnt/backups/backup-$(date +%F_%H-%M-%S).sql &&
-              aws s3 cp /mnt/backups/backup-$(date +%F_%H-%M-%S).sql.gz s3://sql-backup-s3/backups/backup-$(date +%F_%H-%M-%S).sql.gz
+                        my_database > /mnt/backups/backup-$(date +%F_%H-%M).sql &&
+              gzip /mnt/backups/backup-$(date +%F_%H-%M).sql &&
+              aws s3 cp /mnt/backups/backup-$(date +%F_%H-%M).sql.gz s3://sql-backup-s3/backups/backup-$(date +%F_%H-%M).sql.gz
           env:
             - name: MYSQL_USER
               valueFrom:

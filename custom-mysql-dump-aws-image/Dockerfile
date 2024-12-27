@@ -11,3 +11,5 @@ RUN apt-get update && apt-get install -y awscli && apt-get clean
 
 # Switch back to MySQL user
 USER mysql
+
+

@@ -746,7 +746,7 @@ server:
     scrape_interval: 30s
     static_configs:
       - targets: 
-          - mysql-metrics-service.app.svc.cluster.local:9104
+          - mysql-metrics.app.svc.cluster.local:9104
 
   ## @param server.replicaCount Number of Prometheus replicas to deploy
   ##
