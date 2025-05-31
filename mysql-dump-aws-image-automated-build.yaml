@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: kaniko-build-push-slack-
+spec:
+  entrypoint: build-and-notify
+  serviceAccountName: argo
+  arguments:
+    parameters:
+      - name: version
+        value: "1.0.0"
+
+  templates:
+    - name: build-and-notify
+      steps:
+        - - name: build-image
+            template: build-docker-image
+            arguments:
+              parameters:
+                - name: version
+                  value: "{{workflow.parameters.version}}"
+        - - name: notify-slack
+            template: send-slack
+
+    - name: build-docker-image
+      inputs:
+        parameters:
+          - name: version
+      container:
+        image: gcr.io/kaniko-project/executor:latest
+        command: ["/kaniko/executor"]
+        args:
+          - "--dockerfile=custom-mysql-dump-aws-image/Dockerfile"
+          - "--context=git://github.com/gesselsam96/argo-devops-project.git#master"
+          - "--destination=docker.io/gesselsam96/mysql-backup:{{inputs.parameters.version}}"
+        volumeMounts:
+          - name: docker-config
+            mountPath: /kaniko/.docker/
+      volumes:
+        - name: docker-config
+          secret:
+            secretName: dockerhub-creds
+            items:
+              - key: .dockerconfigjson
+                path: config.json
+
+    - name: send-slack
+      script:
+        image: curlimages/curl:latest
+        command: [sh]
+        source: |
+          SLACK_URL=$(cat /slack/url)
+          curl -X POST -H "Content-type: application/json" \
+          --data '{"text":"✅ Docker image build succeeded for version {{workflow.parameters.version}}."}' \
+          "$SLACK_URL"
+        volumeMounts:
+          - name: slack-secret
+            mountPath: /slack
+            readOnly: true
+      volumes:
+        - name: slack-secret
+          secret:
+            secretName: slack-webhook
